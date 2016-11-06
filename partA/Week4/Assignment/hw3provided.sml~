@@ -1,0 +1,111 @@
+(* Coursera Programming Languages, Homework 3, Provided Code *)
+
+(* Problem 1 solution *)
+val only_capitals = List.filter (fn str => Char.isUpper (String.sub (str, 0)))
+
+(* Problem 2 solution *)
+val longest_string1 = foldl (fn (str1, str2) => if String.size str1 > String.size str2 then str1 else str2) ""
+
+(* Problem 3 solution *)
+val longest_string2 = foldl (fn (str1, str2) => if String.size str1 >= String.size str2 then str1 else str2) ""
+
+(* Problem 4 solution *)
+val longest_string_helper = fn f => fn xs => foldl (fn (x, y) => if f(String.size x, String.size y) then x else y) "" xs
+
+val longest_string3 = longest_string_helper (fn (x, y) => x > y)
+
+val longest_string4 = longest_string_helper(fn (x, y) => x >= y)
+
+(* Problem 5 solution *)
+val longest_capitalized = longest_string1 o only_capitals
+
+(* Problem 6 solution *)
+val rev_string = implode o rev o explode
+
+(* Problem 7 solution *)
+exception NoAnswer
+fun first_answer f xs =
+  case xs of
+      [] => raise NoAnswer
+    | x::xs' => case f x of
+		    NONE => first_answer f xs'
+		  | SOME v => v
+
+(* Problem 8 solution *)
+fun all_answers f xs =
+  case xs of [] => SOME []
+	   | _ => let fun helper (lst, acc) =
+			case lst of [] => acc
+				  | head::tail => case f head of NONE => helper(tail, acc)
+							       | SOME v => helper(tail, acc @ v)
+		  in
+		      case helper(xs, []) of [] => NONE
+					   | res => SOME res			 
+		  end
+
+datatype pattern = Wildcard
+		 | Variable of string
+		 | UnitP
+		 | ConstP of int
+		 | TupleP of pattern list
+		 | ConstructorP of string * pattern
+
+datatype valu = Const of int
+	      | Unit
+	      | Tuple of valu list
+	      | Constructor of string * valu
+
+fun g f1 f2 p =
+    let 
+	val r = g f1 f2 
+    in
+	case p of
+	    Wildcard          => f1 ()
+	  | Variable x        => f2 x
+	  | TupleP ps         => List.foldl (fn (p,i) => (r p) + i) 0 ps
+	  | ConstructorP(_,p) => r p
+	  | _                 => 0
+    end
+
+(* Problem 9a solution *)
+val count_wildcards = g (fn () => 1) (fn x => 0)
+
+(* Problem 9b solution *)
+val count_wild_and_variable_lengths = g (fn () => 1) (fn x => String.size x)
+
+(* Problem 9c solution *)
+fun count_some_var (str, p) = g (fn () => 0) (fn x => if x = str then 1 else 0) p			  
+(* Problem 10 solution *)
+fun check_pat pat =
+  let fun helper1 (p, acc) =
+	case p of
+	  Variable x => [x] @ acc
+	| TupleP ps => (foldl helper1 [] ps) @ acc
+	| ConstructorP(_, p) => helper1(p, []) @ acc
+	| _ => acc
+      fun helper2 xs =
+	case xs of
+	    [] => true
+	  | x::xs' => not (List.exists (fn y => y = x) xs') andalso helper2 xs'
+  in
+      helper2 (helper1 (pat, []))
+  end
+
+(* Problem 11 solution *)
+fun match (_, Wildcard) = SOME []
+  | match (Variable s, Const v) = SOME [(s, v)]
+  | match (UnitP, Unit) = SOME []
+  | match (ConstP p, Const v) = if p = v then SOME [] else NONE
+  | match (TupleP ps, Tuple vs) = all_answers match ListPair.zip(ps, vs)
+  | match (ConstructorP (s1, p), Constructor (s2, v)) = if s1 = s2 then math(v, p) else NONE
+
+
+(**** for the challenge problem only ****)
+
+datatype typ = Anything
+	     | UnitT
+	     | IntT
+	     | TupleT of typ list
+	     | Datatype of string
+
+(**** you can put all your code here ****)

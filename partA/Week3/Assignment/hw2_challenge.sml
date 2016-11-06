@@ -1,0 +1,241 @@
+(* Dan Grossman, Coursera PL, HW2 Provided Code *)
+
+(* if you use this function to compare two strings (returns true if the same
+   string), then you avoid several of the functions in problem 1 having
+   polymorphic types that may be confusing *)
+fun same_string(s1 : string, s2 : string) =
+    s1 = s2
+
+(* put your solutions for problem 1 here *)
+
+	      (* Problem 1 a solution *)
+fun all_except_option (str, lst) =
+  let fun except (str, []) = []
+	| except (str, head::rest) = if same_string(str, head) then rest
+				     else head::except(str, rest)
+  in
+      let val res = except(str, lst) in
+	  if res = lst
+	  then NONE
+	  else SOME res
+      end
+  end
+
+      (* Problem 2 solution *)
+fun get_substitutions1 (substitutions: string list list, s: string) =
+  case substitutions of
+      [] => []
+    | head::tail => let val cur = all_except_option(s, head) in
+			case cur of
+			    NONE => get_substitutions1(tail, s)
+			  | SOME value => value @ get_substitutions1(tail, s)
+		    end
+			
+			(* Problem 3 solution *)
+fun get_substitutions2 (subs: string list list, s: string) =
+  let fun tail_rec (cur, res) =
+      case cur of
+	  [] => res
+	| head::tail => let val tmp = all_except_option(s, head) in
+			    case tmp of
+				NONE => tail_rec(tail, res)
+			      | SOME value => tail_rec(tail, res @ value)
+			end
+  in
+	  tail_rec(subs, [])
+  end
+      
+      (* Problem 4 solution *)
+fun similar_names (subs, name) =
+  let fun replaceFirst (rep, {first=fir, middle=mid, last=las}) =
+	{first=rep, middle=mid, last=las}
+  in
+    let fun getRes ([], name) = []
+	| getRes (head::tail, name) = replaceFirst(head, name)::getRes(tail, name)
+    in
+	case name of
+	    {first=fir, middle=mid, last=las} => getRes(fir::get_substitutions2(subs, fir), name)
+    end
+  end
+      
+(* you may assume that Num is always used with values 2, 3, ..., 10
+   though it will not really come up *)
+datatype suit = Clubs | Diamonds | Hearts | Spades
+datatype rank = Jack | Queen | King | Ace | Num of int 
+type card = suit * rank
+
+datatype color = Red | Black
+datatype move = Discard of card | Draw 
+
+exception IllegalMove
+
+(* put your solutions for problem 2 here *)
+
+(* Problem 5 solution *)
+fun card_color card =
+  case card of
+      (Clubs, rank) => Black
+    | (Spades, rank) => Black
+    | _ => Red
+
+	       (* Problem 6 solution *)
+fun card_value card =
+  case card of
+      (suit, Num n) => n
+    | (suit, Ace) => 11
+    | (suit, _) => 10
+
+		       (* Problem 7 solution *)
+fun remove_card (cs: card list, c: card, e) =
+  let fun remove (cs, c) =
+	case cs of
+	    [] => []
+	  | head::tail => if head = c then tail
+			  else head::remove(tail, c)
+  in
+      let val res = remove(cs, c) in
+	  if res = cs
+	  then raise e
+	  else res
+      end
+  end
+      
+      (* Problem 8 solution *)
+fun all_same_color (cs: card list) =
+  case cs of
+      h1::(h2::rest) => card_color(h1) = card_color(h2) andalso all_same_color(h2::rest)
+    | _ => true
+
+	      (* Problem 9 solution *)
+fun sum_cards (cs: card list) =
+  let fun tail_rec (cs, res) =
+	case cs of
+	    [] => res
+	  | head::tail => tail_rec(tail, res + card_value(head))
+  in
+      tail_rec(cs, 0)
+  end
+      
+      (* Problem 10 solution *)
+fun score (cs: card list, goal: int) =
+  let val sum = sum_cards(cs) in
+      let val pre1 = (sum - goal) * 3; val pre2 = (goal - sum) in
+	  if sum >= goal
+	  then if all_same_color(cs)
+	       then pre1 div 2
+	       else pre1
+	  else
+	      if all_same_color(cs)
+	      then pre2 div 2
+	      else pre2
+      end
+  end
+
+(* Problem 12 solution Challenge *)
+fun count_ace (cs: card list, cnt: int) =
+  case cs of
+      [] => cnt
+    | x::xs' => let val (Suit, Rank) = x in
+		    case Rank of
+			Ace => count_ace (xs', cnt + 1)
+		      | _ => count_ace(xs', cnt)
+		end
+
+fun minium (array: int list) =
+  case array of
+      [] => 0
+    | x::xs' => let fun min_acc (array, acc) =
+		      case array of
+			  [] => acc
+			| head::tail => if head < acc      
+					then min_acc(tail, head) else min_acc(tail, acc)
+		in
+		    min_acc (xs', x)
+		end
+
+fun pre_score (cs: card list, sum: int, goal: int) =
+  let val pre1 = (sum - goal) * 3; val pre2 = (goal - sum) in
+      if sum >= goal
+      then if all_same_color(cs)
+	   then pre1 div 2
+	   else pre1
+      else
+	  if all_same_color(cs)
+	  then pre2 div 2
+	  else pre2 
+  end
+
+fun get_all_score (cs: card list, sum: int, goal: int, cnt: int, res) =
+  if cnt < 0
+  then res
+  else get_all_score(cs, sum, goal, cnt - 1, pre_score(cs, sum - cnt * 10, goal)::res)
+
+fun minium_sum (cs: card list) =
+  sum_cards(cs) - 10 * count_ace(cs, 0)
+		    
+fun score_challenge (cs: card list, goal: int) =
+  minium (get_all_score(cs, sum_cards(cs), goal, count_ace(cs, 0), []))
+	 
+(* Problem 11 solution *)
+fun officiate (cs: card list, mv: move list, goal: int) =
+  let fun helper (cs: card list, hold: card list, mv: move list, goal: int) =
+	case mv of
+	    [] => score(hold, goal)
+	  | head::tail => case head of
+			      Discard card => helper(cs, remove_card(hold, card, IllegalMove), tail, goal)
+			    | Draw => case cs of
+					  [] => score(hold, goal)
+					| h::t => if sum_cards(h::hold) > goal
+						  then score(h::hold, goal)
+						  else helper(t, h::hold, tail, goal)
+  in
+      helper(cs, [], mv, goal)
+  end
+
+(* Problem 13 solution Challenge *)
+fun officiate_challenge (cs: card list, mv: move list, goal: int) =
+  let fun helper (cs: card list, hold: card list, mv: move list, goal: int) =
+	case mv of
+	    [] => score_challenge(hold, goal)
+	  | head::tail => case head of
+			      Discard card => helper(cs, remove_card(hold, card, IllegalMove), tail, goal)
+			    | Draw => case cs of
+					  [] => score_challenge(hold, goal)
+					| h::t => if minium_sum(h::hold) > goal
+						  then score_challenge(h::hold, goal)
+						  else helper(t, h::hold, tail, goal)
+  in
+      helper(cs, [], mv, goal)
+  end
+
+
+(* 3-b *)
+fun if_discard_then_draw(held, next_card, goal) =
+  case held of
+      [] => NONE
+    | head::tail => if score(next_card::tail, goal) = 0
+		    then SOME head
+		    else if_discard_then_draw(tail, next_card, goal)
+
+fun careful_player (clst, goal) =
+  let fun aux (clst, goal, mlst, held) =
+	if goal > (10 + sum_cards(held))
+	then case clst of
+		 [] => mlst@[Draw]
+	       | head::tail => if score(head::held, goal) = 0
+			       then mlst@[Draw]
+			       else aux(tail, goal, mlst@[Draw], head::held)
+	else if goal = sum_cards(held)
+	then mlst
+	else case clst of
+		 [] => mlst
+	       | head::tail => if sum_cards(head::held) > goal
+			       then case if_discard_then_draw(held, head, goal) of
+					NONE => mlst
+				      | SOME card => mlst@[Discard(card), Draw]
+			       else aux(tail, goal, mlst@[Draw], head::held)
+  in
+      aux(clst, goal, [], [])
+  end
+      
+
